@@ -2,7 +2,7 @@
 pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "./interfaces/ISocialMediaToken.sol";
+import "./interfaces/IContentMediaToken.sol";
 import "./post.sol";
 import "hardhat/console.sol";
 
@@ -20,7 +20,7 @@ contract ContentMediaSettlement is Ownable {
     }
 
     ISocialMediaToken public token;
-    SocialMediaVoting public votingContract;
+    ContentMediaVoting public votingContract;
 
     mapping(uint256 => uint256) public dailyMintAllocation;
     mapping(uint256 => mapping(address => bool)) public claimedRewards;
@@ -30,7 +30,7 @@ contract ContentMediaSettlement is Ownable {
 
     constructor(address tokenAddress, address votingContractAddress) Ownable(msg.sender) {
         token = ISocialMediaToken(tokenAddress);
-        votingContract = SocialMediaVoting(votingContractAddress);
+        votingContract = ContentMediaVoting(votingContractAddress);
         lastSettlementTime = block.timestamp;
     }
 

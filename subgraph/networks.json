@@ -1,0 +1,8 @@
+{
+  "base-sepolia": {
+    "Curate_Token": {
+      "address": "0xe2F0a8e51B4C9C59d5E9b14d266D351321bC2390",
+      "startBlock": 21588740
+    }
+  }
+}
