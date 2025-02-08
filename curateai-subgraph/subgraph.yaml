@@ -1,0 +1,58 @@
+specVersion: 1.0.0
+indexerHints:
+  prune: auto
+schema:
+  file: ./schema.graphql
+dataSources:
+  - kind: ethereum
+    name: Token
+    network: base-sepolia
+    source:
+      address: "0xD2cEcc2BffBd5d01aCA483876BA38326a8a1e9dE"
+      abi: Token
+      startBlock: 21625427
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - Approval
+        - OwnershipTransferred
+        - Transfer
+      abis:
+        - name: Token
+          file: ./abis/Token.json
+      eventHandlers:
+        - event: Approval(indexed address,indexed address,uint256)
+          handler: handleApproval
+        - event: OwnershipTransferred(indexed address,indexed address)
+          handler: handleOwnershipTransferred
+        - event: Transfer(indexed address,indexed address,uint256)
+          handler: handleTransfer
+      file: ./src/token.ts
+  - kind: ethereum
+    name: Contract
+    network: base-sepolia
+    source:
+      address: "0xD812Dc75948583a796dA72c8e789F03Ba63B53b0"
+      abi: Contract
+      startBlock: 21625431
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - ContractOwnershipTransferred
+        - PostCreated
+        - Voted
+      abis:
+        - name: Contract
+          file: ./abis/Contract.json
+      eventHandlers:
+        - event: OwnershipTransferred(indexed address,indexed address)
+          handler: handleOwnershipTransferred
+        - event: PostCreated(uint256,address,string)
+          handler: handlePostCreated
+        - event: Voted(uint256,address,uint256)
+          handler: handleVoted
+      file: ./src/contract.ts
