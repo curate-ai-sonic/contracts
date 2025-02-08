@@ -30,3 +30,52 @@ dataSources:
         - event: Transfer(indexed address,indexed address,uint256)
           handler: handleTransfer
       file: ./src/curate-token.ts
+  - kind: ethereum
+    name: Voting
+    network: base-sepolia
+    source:
+      address: "0xD812Dc75948583a796dA72c8e789F03Ba63B53b0"
+      abi: Voting
+      startBlock: 21625431
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - VotingOwnershipTransferred
+        - PostCreated
+        - Voted
+      abis:
+        - name: Voting
+          file: ./abis/Voting.json
+      eventHandlers:
+        - event: OwnershipTransferred(indexed address,indexed address)
+          handler: handleOwnershipTransferred
+        - event: PostCreated(uint256,address,string)
+          handler: handlePostCreated
+        - event: Voted(uint256,address,uint256)
+          handler: handleVoted
+      file: ./src/voting.ts
+  - kind: ethereum
+    name: Settlement
+    network: base-sepolia
+    source:
+      address: "0x2b9dC106d3d57B2dcE0A7a1A614dE9939Cf66467"
+      abi: Settlement
+      startBlock: 21625435
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - DailySettlement
+        - SettlementOwnershipTransferred
+      abis:
+        - name: Settlement
+          file: ./abis/Settlement.json
+      eventHandlers:
+        - event: DailySettlement(uint256,uint256)
+          handler: handleDailySettlement
+        - event: OwnershipTransferred(indexed address,indexed address)
+          handler: handleOwnershipTransferred
+      file: ./src/settlement.ts

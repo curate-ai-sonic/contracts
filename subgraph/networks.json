@@ -3,6 +3,12 @@
     "Curate_Token": {
       "address": "0xe2F0a8e51B4C9C59d5E9b14d266D351321bC2390",
       "startBlock": 21588740
+    },
+    "Voting": {
+      "address": "0xD812Dc75948583a796dA72c8e789F03Ba63B53b0"
+    },
+    "Settlement": {
+      "address": "0x2b9dC106d3d57B2dcE0A7a1A614dE9939Cf66467"
     }
   }
 }
