@@ -1,6 +1,6 @@
 {
   "base-sepolia": {
-    "Curate-Token": {
+    "Token": {
       "address": "0xD2cEcc2BffBd5d01aCA483876BA38326a8a1e9dE",
       "startBlock": 21625427
     }

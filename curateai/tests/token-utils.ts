@@ -4,7 +4,7 @@ import {
   Approval,
   OwnershipTransferred,
   Transfer
-} from "../generated/Curate-Token/Curate-Token"
+} from "../generated/Token/Token"
 
 export function createApprovalEvent(
   owner: Address,

@@ -2,7 +2,7 @@ import {
   Approval as ApprovalEvent,
   OwnershipTransferred as OwnershipTransferredEvent,
   Transfer as TransferEvent
-} from "../generated/Curate-Token/Curate-Token"
+} from "../generated/Token/Token"
 import { Approval, OwnershipTransferred, Transfer } from "../generated/schema"
 
 export function handleApproval(event: ApprovalEvent): void {

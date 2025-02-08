@@ -5,11 +5,11 @@ schema:
   file: ./schema.graphql
 dataSources:
   - kind: ethereum
-    name: Curate-Token
+    name: Token
     network: base-sepolia
     source:
       address: "0xD2cEcc2BffBd5d01aCA483876BA38326a8a1e9dE"
-      abi: Curate-Token
+      abi: Token
       startBlock: 21625427
     mapping:
       kind: ethereum/events
@@ -20,8 +20,8 @@ dataSources:
         - OwnershipTransferred
         - Transfer
       abis:
-        - name: Curate-Token
-          file: ./abis/Curate-Token.json
+        - name: Token
+          file: ./abis/Token.json
       eventHandlers:
         - event: Approval(indexed address,indexed address,uint256)
           handler: handleApproval
@@ -29,4 +29,4 @@ dataSources:
           handler: handleOwnershipTransferred
         - event: Transfer(indexed address,indexed address,uint256)
           handler: handleTransfer
-      file: ./src/curate-token.ts
+      file: ./src/token.ts
