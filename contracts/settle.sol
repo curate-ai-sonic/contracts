@@ -1,62 +1,83 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/access/AccessControl.sol";
 import "./interfaces/IContentMediaToken.sol";
-import "./post.sol";
-import "hardhat/console.sol";
+import "./interfaces/IContentMediaVoting.sol";
 
-contract ContentMediaSettlement is Ownable {
-
-    struct Post {
-        uint256 id;
-        address author;
-        string contentHash;
-        uint256 totalScore;
-        uint256 claimedScore;
-        uint256 createdAt;
-        bool newVote;
-        bool aiVoted;
-    }
-
-    ISocialMediaToken public token;
-    ContentMediaVoting public votingContract;
-
-    mapping(uint256 => uint256) public dailyMintAllocation;
-    mapping(uint256 => mapping(address => bool)) public claimedRewards;
-    uint256 public lastSettlementTime;
-
-    event DailySettlement(uint256 totalTokensDistributed, uint256 timestamp);
-
-    constructor(address tokenAddress, address votingContractAddress) Ownable(msg.sender) {
-        token = ISocialMediaToken(tokenAddress);
-        votingContract = ContentMediaVoting(votingContractAddress);
-        lastSettlementTime = block.timestamp;
-    }
-
-    function settleDailyTokens() external onlyOwner {
-        // require(block.timestamp >= lastSettlementTime + 1 days, "Can only settle once per day");
-
-        token.mintDailyTokens();
-
-        uint256 totalVotes = votingContract.dailyVoteTotals();
-
-        if (totalVotes > 0) {
-            uint256 dailyMintAmount = 100000;
-            for (uint256 i = 1; i <= votingContract.postCounter(); i++) {
-                (, address author, , uint256 totalScore, uint256 claimedScore, , bool newVote, ) = votingContract.posts(i);
-                if (newVote) {
-                    uint256 claimableAmount = totalScore - claimedScore;
-                    uint256 tokensToDistribute = (dailyMintAmount * claimableAmount) / totalVotes;
-                    claimedScore += claimableAmount;
-                    newVote = false;
-                    token.distributeTokens(author, tokensToDistribute);
-                }
-            }
-        }
+contract ContentMediaSettlement is AccessControl {
+    IContentMediaToken public token;
+    IContentMediaVoting public voting;
     
-        lastSettlementTime = block.timestamp;
-        emit DailySettlement(token.DAILY_MINT_AMOUNT(), block.timestamp);
+    struct DailyReward {
+        uint256 totalReward;
+        uint256 rewardPerVote;
+        bool settled;
+    }
+    
+    mapping(uint256 => DailyReward) public dailyRewards;
+    mapping(address => mapping(uint256 => bool)) private _claimedDays;
+
+    event DailySettlement(uint256 day, uint256 totalReward);
+    event RewardsClaimed(address user, uint256 totalAmount);
+
+    constructor(address tokenAddress, address votingAddress) {
+        token = IContentMediaToken(tokenAddress);
+        voting = IContentMediaVoting(votingAddress);
+        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
     }
 
+    function settleDay(uint256 day) public {
+    uint256 currentDay = block.timestamp / 1 days;
+    require(currentDay > day, "Can only settle past days");
+    require(!dailyRewards[day].settled, "Day already settled");
+    
+    token.mintDailyRewards();
+    uint256 totalVotes = voting.getDailyTotalVotes(day);
+    
+    uint256 PRECISION = 10**18; // Same as Ether's wei
+    uint256 adjustedRewardPerVote = totalVotes > 0 
+        ? (token.DAILY_MINT_AMOUNT() * PRECISION) / totalVotes 
+        : 0;
+
+    dailyRewards[day] = DailyReward({
+        totalReward: token.DAILY_MINT_AMOUNT(),
+        rewardPerVote: adjustedRewardPerVote,
+        settled: true
+    });
+
+    emit DailySettlement(day, token.DAILY_MINT_AMOUNT());
+    }
+
+function claimRewards() external {
+    uint256 totalAmount = getClaimableAmount(msg.sender);
+    require(totalAmount > 0, "No rewards to claim");
+
+    uint256 PRECISION = 10**18;
+    uint256 adjustedAmount = totalAmount / PRECISION; 
+
+    token.distribute(msg.sender, adjustedAmount);
+    emit RewardsClaimed(msg.sender, adjustedAmount);
+}
+
+function getClaimableAmount(address user) public view returns (uint256) {
+    uint256[] memory activeDays = voting.getUserVoteDays(user);
+    uint256 totalAmount;
+    
+    for (uint256 i = 0; i < activeDays.length; i++) {
+        uint256 day = activeDays[i];
+        DailyReward storage dr = dailyRewards[day];
+        
+        if (dr.settled && !_claimedDays[user][day]) {
+            uint256 userVotes = voting.getAuthorVotes(day, user);
+            totalAmount += userVotes * dr.rewardPerVote;
+        }
+    }
+    
+    return totalAmount;
+}
+
+    function getCurrentDay() public view returns (uint256) {
+        return block.timestamp / 1 days;
+    }
 }

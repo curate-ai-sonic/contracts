@@ -26,6 +26,7 @@ type Transfer @entity(immutable: true) {
   blockTimestamp: BigInt!
   transactionHash: Bytes!
 }
+
 type VotingOwnershipTransferred @entity(immutable: true) {
   id: Bytes!
   previousOwner: Bytes! # address
@@ -40,6 +41,7 @@ type PostCreated @entity(immutable: true) {
   Voting_id: BigInt! # uint256
   author: Bytes! # address
   contentHash: String! # string
+  tags: String! # string
   blockNumber: BigInt!
   blockTimestamp: BigInt!
   transactionHash: Bytes!
@@ -54,6 +56,7 @@ type Voted @entity(immutable: true) {
   blockTimestamp: BigInt!
   transactionHash: Bytes!
 }
+
 type DailySettlement @entity(immutable: true) {
   id: Bytes!
   totalTokensDistributed: BigInt! # uint256

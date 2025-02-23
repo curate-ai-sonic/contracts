@@ -33,6 +33,8 @@ export function handlePostCreated(event: PostCreatedEvent): void {
   entity.blockTimestamp = event.block.timestamp
   entity.transactionHash = event.transaction.hash
 
+  entity.tags = event.params.tags
+
   entity.save()
 }
 

@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/access/AccessControl.sol";
 import "./interfaces/IContentMediaToken.sol";
 
-contract ContentMediaVoting is Ownable {
+contract ContentMediaVoting is AccessControl {
+    bytes32 public constant AI_AGENT_ROLE = keccak256("AI_AGENT_ROLE");
+
     struct Post {
         uint256 id;
         address author;
@@ -12,43 +14,56 @@ contract ContentMediaVoting is Ownable {
         uint256 totalScore;
         uint256 claimedScore;
         uint256 createdAt;
+        string tags;
         bool newVote;
         bool aiVoted;
     }
 
-    struct Vote {
-        address voter;
-        uint256 amount;
-    }
-
     uint256 public constant VOTES_PER_DAY_MULTIPLIER = 5;
-    ISocialMediaToken public token;
+    IContentMediaToken public token;
     uint256 public postCounter;
-    uint256 public dailyVoteTotals;
     
+    // New mappings for daily tracking
+    mapping(uint256 => mapping(uint256 => uint256)) public dailyPostVotes; // day => postId => votes
+    mapping(uint256 => uint256) public dailyVoteTotals; // day => total votes
+    mapping(address => mapping(uint256 => uint256)) public dailyAuthorVotes; // author => day => votes
+    mapping(address => uint256[]) public userActiveDays; // author => list of days with votes
+
     mapping(uint256 => Post) public posts;
-    mapping(uint256 => Vote[]) public postVotes;
     mapping(address => uint256) public lastVoteResetTime;
     mapping(address => uint256) public votesUsedToday;
 
-    event PostCreated(uint256 id, address author, string contentHash);
+    event PostCreated(uint256 id, address author, string contentHash, string tags);
     event Voted(uint256 postId, address voter, uint256 amount);
+    
 
-    constructor(address tokenAddress) Ownable(msg.sender) {
-        token = ISocialMediaToken(tokenAddress);
+    constructor(address tokenAddress) {
+        token = IContentMediaToken(tokenAddress);
+        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
     }
 
-    function createPost(string memory contentHash) public {
+    function createPost(string calldata contentHash, string calldata tags) external {
         postCounter++;
-        posts[postCounter] = Post(postCounter, msg.sender, contentHash, 0, 0, block.timestamp, false, false);
-        emit PostCreated(postCounter, msg.sender, contentHash);
+        posts[postCounter] = Post({
+            id: postCounter,
+            author: msg.sender,
+            contentHash: contentHash,
+            totalScore: 0,
+            claimedScore: 0,
+            createdAt: block.timestamp,
+            tags: tags,
+            newVote: false,
+            aiVoted: false
+        });
+        emit PostCreated(postCounter, msg.sender, contentHash, tags);
     }
 
-    // Add a requirement to check if user already voted or not
-    function vote(uint256 postId, uint256 amount) public {
+    function vote(uint256 postId, uint256 amount) external execeptRole(AI_AGENT_ROLE){
         require(postId <= postCounter, "Post does not exist");
         require(amount > 0, "Amount must be greater than 0");
 
+        // Todo: Write test for this as well
+        // Reset daily votes if 24 hours have passed
         if (block.timestamp >= lastVoteResetTime[msg.sender] + 1 days) {
             votesUsedToday[msg.sender] = 0;
             lastVoteResetTime[msg.sender] = block.timestamp;
@@ -57,32 +72,69 @@ contract ContentMediaVoting is Ownable {
         uint256 maxVotesToday = VOTES_PER_DAY_MULTIPLIER * token.balanceOf(msg.sender);
         require(votesUsedToday[msg.sender] + amount <= maxVotesToday, "Exceeds daily vote limit");
 
-        posts[postId].totalScore += amount;
-        posts[postId].newVote = true;
-        postVotes[postId].push(Vote(msg.sender, amount));
+        uint256 currentDay = block.timestamp / 1 days;
+        Post storage post = posts[postId];
+
+        // Update post and voting data
+        post.totalScore += amount;
+        post.newVote = true;
+        dailyPostVotes[currentDay][postId] += amount;
+        dailyVoteTotals[currentDay] += amount;
+        dailyAuthorVotes[post.author][currentDay] += amount;
+
+        // Track active days for the author
+        if (dailyAuthorVotes[post.author][currentDay] == amount) {
+            userActiveDays[post.author].push(currentDay);
+        }
+
         votesUsedToday[msg.sender] += amount;
-
-        dailyVoteTotals += amount;
-
         emit Voted(postId, msg.sender, amount);
     }
 
-    function aiVote(uint256 postId, uint256 amount) public onlyOwner {
+    function aiVote(uint256 postId, uint256 amount) external onlyRole(AI_AGENT_ROLE) {
         require(postId <= postCounter, "Post does not exist");
         require(amount > 0, "Amount must be greater than 0");
         require(!posts[postId].aiVoted, "AI can only vote once per post");
         require(block.timestamp < posts[postId].createdAt + 1 days, "AI can only vote on the first day");
 
-        posts[postId].totalScore += amount;
-        postVotes[postId].push(Vote(owner(), amount));
-        posts[postId].aiVoted = true;
+        uint256 currentDay = block.timestamp / 1 days;
+        Post storage post = posts[postId];
 
-        dailyVoteTotals += amount;
+        post.totalScore += amount;
+        dailyPostVotes[currentDay][postId] += amount;
+        dailyVoteTotals[currentDay] += amount;
+        dailyAuthorVotes[post.author][currentDay] += amount;
+        post.aiVoted = true;
 
-        emit Voted(postId, owner(), amount);
+        if (dailyAuthorVotes[post.author][currentDay] == amount) {
+            userActiveDays[post.author].push(currentDay);
+        }
+
+        emit Voted(postId, msg.sender, amount);
     }
 
-    function getPostScore(uint256 postId) public view returns (uint256) {
+    function getPostScore(uint256 postId) external view returns (uint256) {
         return posts[postId].totalScore;
+    }
+
+    function getAuthorVotes(uint256 day, address author) external view returns (uint256) {
+        return dailyAuthorVotes[author][day];
+    }
+
+    function getTotalVotes() external view returns (uint256) {
+        return dailyVoteTotals[block.timestamp / 1 days];
+    }
+
+    function getUserVoteDays(address user) external view returns (uint256[] memory) {
+        return userActiveDays[user];
+    }
+
+    function getDailyTotalVotes(uint256 day) external view returns (uint256) {
+        return dailyVoteTotals[day];
+    }
+
+    modifier execeptRole(bytes32 role) {
+        require(!hasRole(role, msg.sender), "AI agent can't vote directly");
+        _;
     }
 }
