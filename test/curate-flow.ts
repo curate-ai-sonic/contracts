@@ -1,50 +1,84 @@
 import { expect } from "chai";
 import { ethers } from "hardhat";
 import {
-  ContentMediaVoting,
-  ContentMediaToken,
-  ContentMediaSettlement,
+  CurateAIPostAndVote,
+  CurateAIToken,
+  CurateAISettlement,
+  CurateAIRoleManager,
 } from "../typechain-types";
 import keccak256 from "keccak256";
 
 describe("ContentMediaVoting", function () {
-  let contentMediaVoting: ContentMediaVoting;
-  let contentMediaToken: ContentMediaToken;
-  let contentMediaSettlement: ContentMediaSettlement;
+  let contentMediaVoting: CurateAIPostAndVote;
+  let contentMediaToken: CurateAIToken;
+  let contentMediaSettlement: CurateAISettlement;
+  let curateAIRole: CurateAIRoleManager;
   let owner: any;
   let account1: any;
   let account2: any;
   let account3: any;
+  let moderator1: any;
 
   const DAILY_MINT_AMOUNT = 100_000;
 
   before(async function () {
-    [owner, account1, account2, account3] = await ethers.getSigners();
+    [owner, account1, account2, account3, moderator1] =
+      await ethers.getSigners();
+
+    const CurateAIRoleManagerFactory = await ethers.getContractFactory(
+      "CurateAIRoleManager"
+    );
+    curateAIRole =
+      (await CurateAIRoleManagerFactory.deploy()) as CurateAIRoleManager;
 
     const ContentMediaTokenFactory = await ethers.getContractFactory(
-      "ContentMediaToken"
+      "CurateAIToken"
     );
-    contentMediaToken =
-      (await ContentMediaTokenFactory.deploy()) as ContentMediaToken;
+    contentMediaToken = (await ContentMediaTokenFactory.deploy(
+      await curateAIRole.getAddress()
+    )) as CurateAIToken;
 
     const ContentMediaVotingFactory = await ethers.getContractFactory(
-      "ContentMediaVoting"
+      "CurateAIPostAndVote"
     );
     contentMediaVoting = (await ContentMediaVotingFactory.deploy(
-      contentMediaToken.getAddress()
-    )) as ContentMediaVoting;
+      await contentMediaToken.getAddress(),
+      await curateAIRole.getAddress()
+    )) as CurateAIPostAndVote;
 
     const ContentMediaSettlementFactory = await ethers.getContractFactory(
-      "ContentMediaSettlement"
+      "CurateAISettlement"
     );
     contentMediaSettlement = (await ContentMediaSettlementFactory.deploy(
       contentMediaToken.getAddress(),
-      contentMediaVoting.getAddress()
-    )) as ContentMediaSettlement;
+      contentMediaVoting.getAddress(),
+      curateAIRole.getAddress()
+    )) as CurateAISettlement;
 
-    await contentMediaToken.setSettlementContract(
-      contentMediaSettlement.getAddress()
+    await curateAIRole.setSettlementContract(
+      await contentMediaSettlement.getAddress()
     );
+  });
+
+  describe("Add moderators", function () {
+    it("Should add moderators in role manager contract", async function () {
+      await curateAIRole.assignModerator(moderator1);
+      expect(
+        await curateAIRole.hasRole(keccak256("MODERATOR_ROLE"), moderator1)
+      ).to.equal(true);
+    });
+  });
+
+  describe("Add curators", function () {
+    it("Should add curators in role manager contract", async function () {
+      await curateAIRole.connect(moderator1).assignCurator(account1);
+      await curateAIRole.connect(moderator1).assignCurator(account2);
+      await curateAIRole.connect(moderator1).assignCurator(account3);
+      await curateAIRole.connect(moderator1).assignCurator(owner);
+      expect(
+        await curateAIRole.hasRole(keccak256("CURATOR_ROLE"), account1)
+      ).to.equal(true);
+    });
   });
 
   describe("Post Creation", function () {

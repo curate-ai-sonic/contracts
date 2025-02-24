@@ -1,64 +1,168 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.20; // Use latest stable version for security updates
 
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
-contract RoleManager is AccessControl, ReentrancyGuard {
-    bytes32 public constant SUPER_ADMIN_ROLE = keccak256("SUPER_ADMIN_ROLE");
-    bytes32 public constant MODERATOR_ROLE = keccak256("MODERATOR_ROLE");
-    bytes32 public constant CURATOR_ROLE = keccak256("CURATOR_ROLE");
-    bytes32 public constant SETTLEMENT_ROLE = keccak256("SETTLEMENT_ROLE");
-    bytes32 public constant AI_AGENT = keccak256("AI_AGENT_ROLE");
+/**
+ * @title CurateAIRoleManager
+ * @dev Manages roles for the CurateAI ecosystem with a hierarchical access control system.
+ *      Ensures secure role assignment and immutability for critical roles.
+ */
+contract CurateAIRoleManager is AccessControl, ReentrancyGuard {
 
-    bool private _rolesLocked;
+    bytes32 public immutable SUPER_ADMIN_ROLE = keccak256("SUPER_ADMIN_ROLE");
+    bytes32 public immutable MODERATOR_ROLE = keccak256("MODERATOR_ROLE");
+    bytes32 public immutable CURATOR_ROLE = keccak256("CURATOR_ROLE");
+    bytes32 public immutable SETTLEMENT_ROLE = keccak256("SETTLEMENT_ROLE");
+    bytes32 public immutable AI_AGENT_ROLE = keccak256("AI_AGENT_ROLE");
 
+    // Tracks whether the settlement role has been finalized
+    bool private _settlementLocked;
+
+    // Events for role management actions
+    event SettlementContractSet(address indexed settlementContract, address indexed setter);
+    event ModeratorAssigned(address indexed account, address indexed assigner);
+    event ModeratorRevoked(address indexed account, address indexed revoker);
+    event AIAgentAssigned(address indexed account, address indexed assigner);
+    event CuratorAssigned(address indexed account, address indexed assigner);
+
+    /**
+     * @dev Initializes the contract with the deployer as the super admin and initial settlement role holder.
+     */
     constructor() {
-        _grantRole(SUPER_ADMIN_ROLE, msg.sender);
-        _grantRole(SETTLEMENT_ROLE, msg.sender);
+        address deployer = msg.sender;
+        _grantRole(SUPER_ADMIN_ROLE, deployer);
+        _grantRole(SETTLEMENT_ROLE, deployer);
+
         _setRoleAdmin(SUPER_ADMIN_ROLE, SUPER_ADMIN_ROLE);
         _setRoleAdmin(MODERATOR_ROLE, SUPER_ADMIN_ROLE);
         _setRoleAdmin(CURATOR_ROLE, MODERATOR_ROLE);
         _setRoleAdmin(SETTLEMENT_ROLE, SUPER_ADMIN_ROLE);
-        _setRoleAdmin(AI_AGENT, SUPER_ADMIN_ROLE);
+        _setRoleAdmin(AI_AGENT_ROLE, SUPER_ADMIN_ROLE);
     }
 
-    function setSettlementContract(address settlementContract) external onlyRole(SUPER_ADMIN_ROLE) nonReentrant {
-        require(!_rolesLocked, "Settlement role already assigned");
-        require(settlementContract != address(0), "Invalid settlement address");
+    /**
+     * @notice Sets the settlement contract address and locks further changes.
+     * @dev Only callable by the super admin before the settlement role is locked.
+     * @param settlementContract The address to receive the settlement role.
+     */
+    function setSettlementContract(address settlementContract) 
+        external 
+        onlyRole(SUPER_ADMIN_ROLE) 
+        nonReentrant 
+    {
+        require(!_settlementLocked, "Settlement role is already locked");
+        require(settlementContract != address(0), "Settlement address cannot be zero");
 
-        revokeRole(SETTLEMENT_ROLE, msg.sender);
-        grantRole(SETTLEMENT_ROLE, settlementContract);
-        _rolesLocked = true;
+        address currentSetter = msg.sender;
+        _revokeRole(SETTLEMENT_ROLE, currentSetter);
+        _grantRole(SETTLEMENT_ROLE, settlementContract);
+        _settlementLocked = true;
+
+        emit SettlementContractSet(settlementContract, currentSetter);
     }
 
-    function assignModerator(address account) external onlyRole(SUPER_ADMIN_ROLE) nonReentrant {
-        grantRole(MODERATOR_ROLE, account);
+    /**
+     * @notice Assigns the moderator role to an account.
+     * @dev Only callable by the super admin.
+     * @param account The address to receive the moderator role.
+     */
+    function assignModerator(address account) 
+        external 
+        onlyRole(SUPER_ADMIN_ROLE) 
+    {
+        require(account != address(0), "Moderator address cannot be zero");
+        _grantRole(MODERATOR_ROLE, account);
+        emit ModeratorAssigned(account, msg.sender);
     }
 
-    function revokeModerator(address account) external onlyRole(SUPER_ADMIN_ROLE) nonReentrant {
-        revokeRole(MODERATOR_ROLE, account);
+    /**
+     * @notice Revokes the moderator role from an account.
+     * @dev Only callable by the super admin.
+     * @param account The address to lose the moderator role.
+     */
+    function revokeModerator(address account) 
+        external 
+        onlyRole(SUPER_ADMIN_ROLE) 
+    {
+        require(account != address(0), "Moderator address cannot be zero");
+        _revokeRole(MODERATOR_ROLE, account);
+        emit ModeratorRevoked(account, msg.sender);
     }
 
-    function assignAIAgent(address account) external onlyRole(SUPER_ADMIN_ROLE) nonReentrant {
-        grantRole(AI_AGENT, account);
+    /**
+     * @notice Assigns the AI agent role to an account.
+     * @dev Only callable by the super admin.
+     * @param account The address to receive the AI agent role.
+     */
+    function assignAIAgent(address account) 
+        external 
+        onlyRole(SUPER_ADMIN_ROLE) 
+    {
+        require(account != address(0), "AI agent address cannot be zero");
+        _grantRole(AI_AGENT_ROLE, account);
+        emit AIAgentAssigned(account, msg.sender);
     }
 
-    function assignCurator(address account) external onlyRole(MODERATOR_ROLE) nonReentrant {
-        grantRole(CURATOR_ROLE, account);
+    /**
+     * @notice Assigns the curator role to an account.
+     * @dev Only callable by a moderator.
+     * @param account The address to receive the curator role.
+     */
+    function assignCurator(address account) 
+        external 
+        onlyRole(MODERATOR_ROLE) 
+    {
+        require(account != address(0), "Curator address cannot be zero");
+        _grantRole(CURATOR_ROLE, account);
+        emit CuratorAssigned(account, msg.sender);
     }
 
-    function grantRole(bytes32 role, address account) public override onlyRole(getRoleAdmin(role)) nonReentrant {
+    /**
+     * @notice Grants a role to an account, with restrictions on settlement role.
+     * @dev Overrides AccessControl.grantRole to enforce settlement role locking.
+     * @param role The role to grant.
+     * @param account The address to receive the role.
+     */
+    function grantRole(bytes32 role, address account) 
+        public 
+        override 
+        onlyRole(getRoleAdmin(role)) 
+    {
+        require(account != address(0), "Account cannot be zero address");
         if (role == SETTLEMENT_ROLE) {
-            require(!_rolesLocked, "Settlement role is locked");
+            require(!_settlementLocked, "Settlement role is locked");
         }
         super.grantRole(role, account);
     }
 
-    function revokeRole(bytes32 role, address account) public override onlyRole(getRoleAdmin(role)) nonReentrant {
-        if (role == SETTLEMENT_ROLE && role == CURATOR_ROLE && role == AI_AGENT) {
-            require(!_rolesLocked, "Unrevokable role!");
+    /**
+     * @notice Revokes a role from an account, with restrictions on certain roles.
+     * @dev Overrides AccessControl.revokeRole to enforce role immutability.
+     * @param role The role to revoke.
+     * @param account The address to lose the role.
+     */
+    function revokeRole(bytes32 role, address account) 
+        public 
+        override 
+        onlyRole(getRoleAdmin(role)) 
+    {
+        require(account != address(0), "Account cannot be zero address");
+        if (role == CURATOR_ROLE) {
+            revert("Curator role cannot be revoked");
+        }
+        if (role == SETTLEMENT_ROLE && _settlementLocked) {
+            revert("Settlement role cannot be revoked after locking");
         }
         super.revokeRole(role, account);
+    }
+
+    /**
+     * @notice Checks if the settlement role is locked.
+     * @return True if the settlement role is locked, false otherwise.
+     */
+    function isSettlementLocked() external view returns (bool) {
+        return _settlementLocked;
     }
 }

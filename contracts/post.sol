@@ -38,7 +38,7 @@ contract CurateAIPostAndVote is CheckRole {
         token = IContentMediaToken(_tokenAddress);
     }
 
-    function createPost(string calldata contentHash, string calldata tags) external {
+    function createPost(string calldata contentHash, string calldata tags) external onlyRole(CURATOR_ROLE) {
         postCounter++;
         posts[postCounter] = Post({
             id: postCounter,
