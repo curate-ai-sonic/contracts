@@ -1,11 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import "@openzeppelin/contracts/access/AccessControl.sol";
 import "./interfaces/IContentMediaToken.sol";
+import "./utils/checkRole.sol";
 
-contract ContentMediaVoting is AccessControl {
-    bytes32 public constant AI_AGENT_ROLE = keccak256("AI_AGENT_ROLE");
+contract CurateAIPostAndVote is CheckRole {
 
     struct Post {
         uint256 id;
@@ -22,12 +21,11 @@ contract ContentMediaVoting is AccessControl {
     uint256 public constant VOTES_PER_DAY_MULTIPLIER = 5;
     IContentMediaToken public token;
     uint256 public postCounter;
-    
-    // New mappings for daily tracking
-    mapping(uint256 => mapping(uint256 => uint256)) public dailyPostVotes; // day => postId => votes
-    mapping(uint256 => uint256) public dailyVoteTotals; // day => total votes
-    mapping(address => mapping(uint256 => uint256)) public dailyAuthorVotes; // author => day => votes
-    mapping(address => uint256[]) public userActiveDays; // author => list of days with votes
+
+    mapping(uint256 => mapping(uint256 => uint256)) public dailyPostVotes;
+    mapping(uint256 => uint256) public dailyVoteTotals;
+    mapping(address => mapping(uint256 => uint256)) public dailyAuthorVotes;
+    mapping(address => uint256[]) public userActiveDays;
 
     mapping(uint256 => Post) public posts;
     mapping(address => uint256) public lastVoteResetTime;
@@ -36,10 +34,8 @@ contract ContentMediaVoting is AccessControl {
     event PostCreated(uint256 id, address author, string contentHash, string tags);
     event Voted(uint256 postId, address voter, uint256 amount);
     
-
-    constructor(address tokenAddress) {
-        token = IContentMediaToken(tokenAddress);
-        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
+    constructor(address _tokenAddress, address _roleManager) CheckRole(_roleManager){
+        token = IContentMediaToken(_tokenAddress);
     }
 
     function createPost(string calldata contentHash, string calldata tags) external {
@@ -75,14 +71,12 @@ contract ContentMediaVoting is AccessControl {
         uint256 currentDay = block.timestamp / 1 days;
         Post storage post = posts[postId];
 
-        // Update post and voting data
         post.totalScore += amount;
         post.newVote = true;
         dailyPostVotes[currentDay][postId] += amount;
         dailyVoteTotals[currentDay] += amount;
         dailyAuthorVotes[post.author][currentDay] += amount;
 
-        // Track active days for the author
         if (dailyAuthorVotes[post.author][currentDay] == amount) {
             userActiveDays[post.author].push(currentDay);
         }
@@ -133,8 +127,5 @@ contract ContentMediaVoting is AccessControl {
         return dailyVoteTotals[day];
     }
 
-    modifier execeptRole(bytes32 role) {
-        require(!hasRole(role, msg.sender), "AI agent can't vote directly");
-        _;
-    }
+    
 }
