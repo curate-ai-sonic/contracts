@@ -15,17 +15,18 @@ contract CurateAIRoleManager is AccessControl, ReentrancyGuard {
     bytes32 public immutable MODERATOR_ROLE = keccak256("MODERATOR_ROLE");
     bytes32 public immutable CURATOR_ROLE = keccak256("CURATOR_ROLE");
     bytes32 public immutable SETTLEMENT_ROLE = keccak256("SETTLEMENT_ROLE");
+    bytes32 public immutable VOTING_CONTRACT = keccak256("VOTING_CONTRACT");
     bytes32 public immutable AI_AGENT_ROLE = keccak256("AI_AGENT_ROLE");
 
-    // Tracks whether the settlement role has been finalized
-    bool private _settlementLocked;
+    bool private _contractInit;
 
-    // Events for role management actions
     event SettlementContractSet(address indexed settlementContract, address indexed setter);
     event ModeratorAssigned(address indexed account, address indexed assigner);
     event ModeratorRevoked(address indexed account, address indexed revoker);
     event AIAgentAssigned(address indexed account, address indexed assigner);
     event CuratorAssigned(address indexed account, address indexed assigner);
+
+    uint256 public _curator_counter = 0;
 
     /**
      * @dev Initializes the contract with the deployer as the super admin and initial settlement role holder.
@@ -34,11 +35,13 @@ contract CurateAIRoleManager is AccessControl, ReentrancyGuard {
         address deployer = msg.sender;
         _grantRole(SUPER_ADMIN_ROLE, deployer);
         _grantRole(SETTLEMENT_ROLE, deployer);
+        _grantRole(VOTING_CONTRACT, deployer);
 
         _setRoleAdmin(SUPER_ADMIN_ROLE, SUPER_ADMIN_ROLE);
         _setRoleAdmin(MODERATOR_ROLE, SUPER_ADMIN_ROLE);
         _setRoleAdmin(CURATOR_ROLE, MODERATOR_ROLE);
         _setRoleAdmin(SETTLEMENT_ROLE, SUPER_ADMIN_ROLE);
+        _setRoleAdmin(VOTING_CONTRACT, SUPER_ADMIN_ROLE);
         _setRoleAdmin(AI_AGENT_ROLE, SUPER_ADMIN_ROLE);
     }
 
@@ -47,18 +50,21 @@ contract CurateAIRoleManager is AccessControl, ReentrancyGuard {
      * @dev Only callable by the super admin before the settlement role is locked.
      * @param settlementContract The address to receive the settlement role.
      */
-    function setSettlementContract(address settlementContract) 
+    function setSettlementAndVotingContract(address settlementContract, address votingContract) 
         external 
         onlyRole(SUPER_ADMIN_ROLE) 
         nonReentrant 
     {
-        require(!_settlementLocked, "Settlement role is already locked");
+        require(!_contractInit, "Contract is already initialized");
         require(settlementContract != address(0), "Settlement address cannot be zero");
+        require(votingContract != address(0), "Settlement address cannot be zero");
 
         address currentSetter = msg.sender;
         _revokeRole(SETTLEMENT_ROLE, currentSetter);
+        _revokeRole(VOTING_CONTRACT, currentSetter);
         _grantRole(SETTLEMENT_ROLE, settlementContract);
-        _settlementLocked = true;
+        _grantRole(VOTING_CONTRACT, votingContract);
+        _contractInit = true;
 
         emit SettlementContractSet(settlementContract, currentSetter);
     }
@@ -115,6 +121,7 @@ contract CurateAIRoleManager is AccessControl, ReentrancyGuard {
         onlyRole(MODERATOR_ROLE) 
     {
         require(account != address(0), "Curator address cannot be zero");
+        _curator_counter++;
         _grantRole(CURATOR_ROLE, account);
         emit CuratorAssigned(account, msg.sender);
     }
@@ -131,8 +138,8 @@ contract CurateAIRoleManager is AccessControl, ReentrancyGuard {
         onlyRole(getRoleAdmin(role)) 
     {
         require(account != address(0), "Account cannot be zero address");
-        if (role == SETTLEMENT_ROLE) {
-            require(!_settlementLocked, "Settlement role is locked");
+        if (role == SETTLEMENT_ROLE || role == VOTING_CONTRACT) {
+            require(!_contractInit, "Contract roles cannot be changed");
         }
         super.grantRole(role, account);
     }
@@ -152,8 +159,8 @@ contract CurateAIRoleManager is AccessControl, ReentrancyGuard {
         if (role == CURATOR_ROLE) {
             revert("Curator role cannot be revoked");
         }
-        if (role == SETTLEMENT_ROLE && _settlementLocked) {
-            revert("Settlement role cannot be revoked after locking");
+        if (role == SETTLEMENT_ROLE && _contractInit || role == VOTING_CONTRACT && _contractInit) {
+            revert("Contract roles cannot be revoked after locking");
         }
         super.revokeRole(role, account);
     }
@@ -163,6 +170,6 @@ contract CurateAIRoleManager is AccessControl, ReentrancyGuard {
      * @return True if the settlement role is locked, false otherwise.
      */
     function isSettlementLocked() external view returns (bool) {
-        return _settlementLocked;
+        return _contractInit;
     }
 }

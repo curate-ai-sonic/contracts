@@ -20,7 +20,6 @@ contract CurateAISettlement is CheckRole {
     }
 
     mapping(uint256 => DailyReward) public dailyRewards;
-    // mapping(address => mapping(uint256 => bool)) private _claimedDays;
 
     event DailySettlement(uint256 indexed day, uint256 totalReward);
     event RewardsClaimed(address indexed user, uint256 totalAmount);
@@ -110,18 +109,4 @@ contract CurateAISettlement is CheckRole {
     function getCurrentDay() public view returns (uint256) {
         return block.timestamp / 1 days;
     }
-
-    // /**
-    //  * @dev Internal function to mark all active days as claimed for a user.
-    //  * @param user The address of the user claiming rewards.
-    //  */
-    // function _markDaysClaimed(address user) private {
-    //     uint256[] memory activeDays = voting.getUserVoteDays(user);
-    //     for (uint256 i = 0; i < activeDays.length; i++) {
-    //         uint256 day = activeDays[i];
-    //         if (dailyRewards[day].settled && !_claimedDays[user][day]) {
-    //             _claimedDays[user][day] = true;
-    //         }
-    //     }
-    // }
 }

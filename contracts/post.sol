@@ -67,7 +67,7 @@ contract CurateAIPost is CheckRole {
      */
     function setPostScore(uint256 postId, uint256 amount) 
         external 
-        onlyRole(CURATOR_ROLE)
+        onlyRole(VOTING_CONTRACT)
     {
         require(postId > 0 && postId <= postCounter, "Invalid post ID");
         posts[postId].totalScore += amount;
@@ -75,12 +75,12 @@ contract CurateAIPost is CheckRole {
     }
 
     /**
-     * @notice Marks a post as AI-voted, restricted to AI agents.
+     * @notice Marks a post as AI-voted, restricted to voting contract.
      * @param postId The ID of the post to mark.
      */
     function setAIVoted(uint256 postId) 
         external 
-        onlyRole(CURATOR_ROLE) 
+        onlyRole(VOTING_CONTRACT) 
     {
         require(postId > 0 && postId <= postCounter, "Invalid post ID");
         posts[postId].aiVoted = true;

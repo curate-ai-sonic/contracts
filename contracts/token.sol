@@ -17,7 +17,6 @@ contract CurateAIToken is ERC20, ReentrancyGuard, CheckRole {
         require(_roleManager != address(0), "Invalid RoleManager address");
         _mint(msg.sender, INITIAL_SUPPLY / 2);
         _mint(address(this), INITIAL_SUPPLY / 2);
-
     }
 
     function mintDailyRewards() external onlyRole(SETTLEMENT_ROLE) nonReentrant {

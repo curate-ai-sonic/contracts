@@ -8,6 +8,7 @@ abstract contract CheckRole {
     bytes32 public constant SETTLEMENT_ROLE = keccak256("SETTLEMENT_ROLE");
     bytes32 public constant AI_AGENT_ROLE = keccak256("AI_AGENT_ROLE");
     bytes32 public constant CURATOR_ROLE = keccak256("CURATOR_ROLE");
+    bytes32 public constant VOTING_CONTRACT = keccak256("VOTING_CONTRACT");
 
     constructor(address _roleManager) {
         require(_roleManager != address(0), "Invalid RoleManager address");

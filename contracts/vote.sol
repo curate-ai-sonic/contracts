@@ -45,11 +45,13 @@ contract CurateAIVote is CheckRole {
         require(postId <= postContract.postCounter(), "Post does not exist");
         require(amount > 0, "Amount must be greater than 0");
 
+        // Reset voter power after 24 hrs
         if (block.timestamp >= lastVoteResetTime[msg.sender] + 1 days) {
             votesUsedToday[msg.sender] = 0;
             lastVoteResetTime[msg.sender] = block.timestamp;
         }
 
+        // Check if vote limit exceeds maximum
         uint256 maxVotesToday = VOTES_PER_DAY_MULTIPLIER * token.balanceOf(msg.sender);
         require(votesUsedToday[msg.sender] + amount <= maxVotesToday, "Exceeds daily vote limit");
 
@@ -127,6 +129,10 @@ contract CurateAIVote is CheckRole {
         return userActiveDays[user];
     }
 
+    /**
+     * @notice Clears author's active days.
+     * @param user The author’s address.
+     */
     function clearUserVoteDays(address user) external onlyRole(SETTLEMENT_ROLE) {
         delete userActiveDays[user];
     }
